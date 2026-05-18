@@ -17,7 +17,7 @@ def stock_api(stock_id: str):
     if not _STOCK_RE.match(stock_id):
         return jsonify({"error": "無效的股票代號，請輸入 4~6 碼數字"}), 400
     try:
-        inst   = get_institutional(stock_id)
+        inst   = get_institutional(stock_id, days=45)
         margin = get_margin(stock_id)
     except Exception as exc:
         return jsonify({"error": f"查詢失敗：{exc}"}), 500

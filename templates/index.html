@@ -434,6 +434,9 @@ function render(code, data) {
   // chronological order for charts (oldest → newest)
   const chartDates = [...allDates].reverse();
 
+  // Cumulative start: 1st of the month of the oldest display date
+  const monthStart = chartDates[0].slice(0, 8) + '01';
+
   // Derive display name from watchlist if available
   const wl = loadWatchlist().find(x => x.code === code);
   const displayName = wl?.name ? `${code} ${wl.name}` : code;
@@ -441,7 +444,7 @@ function render(code, data) {
   setResult(`
     <!-- ── Institutional chart + table ── -->
     <div class="card">
-      <div class="card-title">📊 ${escHtml(displayName)} 三大法人買賣超（近 ${allDates.length} 日，單位：股）</div>
+      <div class="card-title">📊 ${escHtml(displayName)} 三大法人累計買賣超（自 ${monthStart.slice(5).replace('-','/')} 起累計，單位：股）</div>
       <div class="chart-wrap"><canvas id="instChart"></canvas></div>
       <div class="divider"></div>
       <div class="table-wrap">
@@ -470,10 +473,23 @@ function render(code, data) {
     </div>
   `);
 
+  /* ── compute cumulative from the 1st of the oldest display date's month ── */
+  const cumulDates = inst.map(r => r.date).filter(d => d >= monthStart).sort();
+
+  const cumInstMap = {};
+  let cf = 0, ct = 0, cd = 0, cTot = 0;
+  cumulDates.forEach(d => {
+    cf   += parseNum(instMap[d]?.['外資']) ?? 0;
+    ct   += parseNum(instMap[d]?.['投信']) ?? 0;
+    cd   += parseNum(instMap[d]?.['自營']) ?? 0;
+    cTot += parseNum(instMap[d]?.['合計']) ?? 0;
+    cumInstMap[d] = { '外資': cf, '投信': ct, '自營': cd, '合計': cTot };
+  });
+
   /* ── fill tables ── */
   const instTbody = document.getElementById('instTbody');
   allDates.forEach(d => {
-    const r = instMap[d];
+    const r = cumInstMap[d];
     instTbody.insertAdjacentHTML('beforeend', `<tr>
       <td>${d}</td>
       <td>${r ? fmtCell(r['外資'])  : '<span class="na">-</span>'}</td>
@@ -497,27 +513,22 @@ function render(code, data) {
   if (instChart)   { instChart.destroy();   instChart = null; }
   if (marginChart) { marginChart.destroy(); marginChart = null; }
 
-  /* ── institutional bar chart ── */
-  const foreign  = chartDates.map(d => parseNum(instMap[d]?.['外資'])  ?? 0);
-  const trust    = chartDates.map(d => parseNum(instMap[d]?.['投信'])  ?? 0);
-  const dealer   = chartDates.map(d => parseNum(instMap[d]?.['自營'])  ?? 0);
-  const total    = chartDates.map(d => parseNum(instMap[d]?.['合計'])  ?? 0);
+  /* ── institutional cumulative line chart ── */
+  const foreign  = chartDates.map(d => cumInstMap[d]?.['外資']  ?? 0);
+  const trust    = chartDates.map(d => cumInstMap[d]?.['投信']  ?? 0);
+  const dealer   = chartDates.map(d => cumInstMap[d]?.['自營']  ?? 0);
+  const total    = chartDates.map(d => cumInstMap[d]?.['合計']  ?? 0);
   const shortLabels = chartDates.map(d => d.slice(5)); // MM-DD
 
   instChart = new Chart(document.getElementById('instChart'), {
-    type: 'bar',
+    type: 'line',
     data: {
       labels: shortLabels,
       datasets: [
-        { label: '外資', data: foreign, backgroundColor: 'rgba(25,118,210,.75)',  order: 2 },
-        { label: '投信', data: trust,   backgroundColor: 'rgba(56,142,60,.75)',   order: 2 },
-        { label: '自營', data: dealer,  backgroundColor: 'rgba(245,124,0,.75)',   order: 2 },
-        {
-          label: '三大合計', data: total,
-          type: 'line',
-          borderColor: '#d32f2f', backgroundColor: 'transparent',
-          borderWidth: 2, pointRadius: 3, tension: 0.3, order: 1
-        },
+        { label: '外資',   data: foreign, borderColor: 'rgba(25,118,210,1)',  backgroundColor: 'rgba(25,118,210,.08)', borderWidth: 2, pointRadius: 2, tension: 0.3, fill: false },
+        { label: '投信',   data: trust,   borderColor: 'rgba(56,142,60,1)',   backgroundColor: 'rgba(56,142,60,.08)',  borderWidth: 2, pointRadius: 2, tension: 0.3, fill: false },
+        { label: '自營',   data: dealer,  borderColor: 'rgba(245,124,0,1)',   backgroundColor: 'rgba(245,124,0,.08)',  borderWidth: 2, pointRadius: 2, tension: 0.3, fill: false },
+        { label: '三大合計', data: total, borderColor: '#d32f2f',             backgroundColor: 'transparent',          borderWidth: 2.5, pointRadius: 3, tension: 0.3, fill: false },
       ]
     },
     options: {
@@ -532,8 +543,8 @@ function render(code, data) {
         }
       },
       scales: {
-        x: { stacked: true, grid: { display: false } },
-        y: { stacked: true, ticks: { callback: v => (v/1e6).toFixed(1)+'M' } }
+        x: { grid: { display: false } },
+        y: { ticks: { callback: v => (v/1e6).toFixed(1)+'M' }, grid: { color: '#f0f0f0' } }
       }
     }
   });

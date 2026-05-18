@@ -27,7 +27,7 @@ Copy `.env.example` to `.env` and fill in credentials before running.
 
 ### Data flow (`stock_data.py`)
 
-- `get_institutional(stock_id)` — fetches 三大法人買賣超 from FinMind (`TaiwanStockInstitutionalInvestorsBuySell`), aggregates by date into 外資 / 投信 / 自營 / 合計.
+- `get_institutional(stock_id, days=45)` — fetches 三大法人買賣超 from FinMind (`TaiwanStockInstitutionalInvestorsBuySell`), aggregates by date into 外資 / 投信 / 自營 / 合計. Returns 45 days to cover month-start cumulative calculations.
 - `get_margin(stock_id)` — tries FinMind first (`TaiwanStockMarginPurchaseShortSale`); falls back to parallel TWSE scraping (`_margin_twse_parallel`) if FinMind returns no data.
 
 ### Environment variables
@@ -38,4 +38,8 @@ Copy `.env.example` to `.env` and fill in credentials before running.
 
 ### Web UI watchlist
 
-The watchlist in `index.html` is entirely client-side — stored in `localStorage` under key `tw_stock_watchlist`. Default list (6 stocks) is seeded at first load. No backend changes are needed to modify watchlist behaviour.
+The watchlist in `index.html` is entirely client-side — stored in `localStorage` under key `tw_stock_watchlist`. Default list (6 preset stocks) is seeded at first load. No backend changes are needed to modify watchlist behaviour.
+
+### Institutional cumulative logic (frontend)
+
+The 三大法人 table and chart display **cumulative** buy/sell totals, not daily values. The accumulation starts from the 1st of the month of the oldest displayed date (e.g., if the 20-day window starts on 4/20, the cumulative begins from 4/1). `monthStart` must be computed before `setResult()` is called — using it inside the template string before declaration causes a `ReferenceError`.
