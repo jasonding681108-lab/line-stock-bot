@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>台灣股票法人與融資融券查詢</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f0f2f5;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1a73e8;
+      color: #fff;
+      padding: 18px 24px;
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+
+    .container { max-width: 960px; margin: 32px auto; padding: 0 16px 48px; }
+
+    .search-box {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .search-box input {
+      flex: 1;
+      padding: 12px 16px;
+      font-size: 1rem;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .search-box input:focus { border-color: #1a73e8; }
+
+    .search-box button {
+      padding: 12px 28px;
+      font-size: 1rem;
+      background: #1a73e8;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .search-box button:hover  { background: #1558b0; }
+    .search-box button:disabled { background: #aaa; cursor: not-allowed; }
+
+    #status {
+      text-align: center;
+      color: #888;
+      margin: 20px 0;
+      font-size: .95rem;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      margin-bottom: 28px;
+      overflow: hidden;
+    }
+
+    .card-title {
+      padding: 14px 20px;
+      font-size: 1rem;
+      font-weight: 600;
+      border-bottom: 1px solid #eee;
+      background: #fafafa;
+    }
+
+    .chart-wrap {
+      padding: 20px;
+      position: relative;
+      height: 300px;
+    }
+
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .86rem;
+    }
+
+    th {
+      background: #f5f7fa;
+      padding: 9px 14px;
+      text-align: right;
+      font-weight: 600;
+      color: #555;
+      border-bottom: 2px solid #e8eaed;
+      white-space: nowrap;
+    }
+    th:first-child { text-align: center; }
+
+    td {
+      padding: 8px 14px;
+      text-align: right;
+      border-bottom: 1px solid #f0f0f0;
+      white-space: nowrap;
+    }
+    td:first-child { text-align: center; color: #666; }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8f9ff; }
+
+    .pos { color: #d32f2f; font-weight: 500; }
+    .neg { color: #1565c0; font-weight: 500; }
+    .na  { color: #bbb; }
+
+    .error-msg {
+      background: #fff3f3;
+      border: 1px solid #f8b4b4;
+      color: #c62828;
+      padding: 12px 16px;
+      border-radius: 8px;
+    }
+
+    .divider { height: 1px; background: #eee; margin: 0 20px; }
+  </style>
+</head>
+<body>
+
+<header>📊 台灣股票法人買賣超 ＋ 融資融券查詢</header>
+
+<div class="container">
+  <div class="search-box">
+    <input id="code" type="text" placeholder="輸入股票代號，例如 2330" maxlength="6"
+           onkeydown="if(event.key==='Enter') doSearch()" />
+    <button id="btn" onclick="doSearch()">查詢</button>
+  </div>
+
+  <div id="status"></div>
+  <div id="result"></div>
+</div>
+
+<script>
+let instChart = null;
+let marginChart = null;
+
+async function doSearch() {
+  const code = document.getElementById('code').value.trim();
+  if (!/^\d{4,6}$/.test(code)) {
+    setResult('<div class="error-msg">請輸入 4~6 碼數字股票代號</div>');
+    return;
+  }
+  setLoading(true);
+  document.getElementById('status').textContent = '查詢中，請稍候…';
+  document.getElementById('result').innerHTML = '';
+
+  try {
+    const res  = await fetch(`/api/stock/${code}`);
+    const data = await res.json();
+    if (data.error) {
+      setResult(`<div class="error-msg">${data.error}</div>`);
+    } else {
+      render(code, data);
+    }
+  } catch(e) {
+    setResult('<div class="error-msg">連線失敗，請稍後再試</div>');
+  }
+  document.getElementById('status').textContent = '';
+  setLoading(false);
+}
+
+function setLoading(on) { document.getElementById('btn').disabled = on; }
+function setResult(html) { document.getElementById('result').innerHTML = html; }
+
+/* ── number helpers ── */
+function parseNum(n) {
+  if (n === null || n === undefined) return null;
+  const v = typeof n === 'string' ? parseInt(n.replace(/,/g,'')) : n;
+  return isNaN(v) ? null : v;
+}
+function fmtCell(n, sign=true) {
+  const v = parseNum(n);
+  if (v === null) return '<span class="na">-</span>';
+  const cls = v > 0 ? 'pos' : v < 0 ? 'neg' : '';
+  const s   = sign && v > 0 ? '+' : '';
+  return `<span class="${cls}">${s}${v.toLocaleString()}</span>`;
+}
+function fmtBal(n) {
+  const v = parseNum(n);
+  return v === null ? '<span class="na">-</span>' : v.toLocaleString();
+}
+
+/* ── main render ── */
+function render(code, data) {
+  const inst   = data.institutional || [];
+  const margin = data.margin        || [];
+
+  const instMap   = Object.fromEntries(inst.map(r=>[r.date,r]));
+  const marginMap = Object.fromEntries(margin.map(r=>[r.date,r]));
+  const allDates  = [...new Set([...inst.map(r=>r.date),...margin.map(r=>r.date)])]
+                      .sort((a,b)=>b.localeCompare(a)).slice(0,20);
+
+  if (!allDates.length) {
+    setResult('<div class="error-msg">查無資料，請確認股票代號是否正確</div>');
+    return;
+  }
+
+  // chronological order for charts (oldest → newest)
+  const chartDates = [...allDates].reverse();
+
+  setResult(`
+    <!-- ── Institutional chart + table ── -->
+    <div class="card">
+      <div class="card-title">📊 ${code} 三大法人買賣超（近 ${allDates.length} 日，單位：股）</div>
+      <div class="chart-wrap"><canvas id="instChart"></canvas></div>
+      <div class="divider"></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>日期</th><th>外資</th><th>投信</th><th>自營</th><th>三大合計</th>
+          </tr></thead>
+          <tbody id="instTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Margin chart + table ── -->
+    <div class="card">
+      <div class="card-title">📈 ${code} 融資融券餘額（近 ${allDates.length} 日，單位：張）</div>
+      <div class="chart-wrap"><canvas id="marginChart"></canvas></div>
+      <div class="divider"></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>日期</th><th>融資餘額</th><th>融券餘額</th>
+          </tr></thead>
+          <tbody id="marginTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  `);
+
+  /* ── fill tables ── */
+  const instTbody = document.getElementById('instTbody');
+  allDates.forEach(d => {
+    const r = instMap[d];
+    instTbody.insertAdjacentHTML('beforeend', `<tr>
+      <td>${d}</td>
+      <td>${r ? fmtCell(r['外資'])  : '<span class="na">-</span>'}</td>
+      <td>${r ? fmtCell(r['投信'])  : '<span class="na">-</span>'}</td>
+      <td>${r ? fmtCell(r['自營'])  : '<span class="na">-</span>'}</td>
+      <td>${r ? fmtCell(r['合計'])  : '<span class="na">-</span>'}</td>
+    </tr>`);
+  });
+
+  const marginTbody = document.getElementById('marginTbody');
+  allDates.forEach(d => {
+    const r = marginMap[d];
+    marginTbody.insertAdjacentHTML('beforeend', `<tr>
+      <td>${d}</td>
+      <td>${r ? fmtBal(r['融資餘額']) : '<span class="na">-</span>'}</td>
+      <td>${r ? fmtBal(r['融券餘額']) : '<span class="na">-</span>'}</td>
+    </tr>`);
+  });
+
+  /* ── destroy old charts ── */
+  if (instChart)   { instChart.destroy();   instChart = null; }
+  if (marginChart) { marginChart.destroy(); marginChart = null; }
+
+  /* ── institutional bar chart ── */
+  const foreign  = chartDates.map(d => parseNum(instMap[d]?.['外資'])  ?? 0);
+  const trust    = chartDates.map(d => parseNum(instMap[d]?.['投信'])  ?? 0);
+  const dealer   = chartDates.map(d => parseNum(instMap[d]?.['自營'])  ?? 0);
+  const total    = chartDates.map(d => parseNum(instMap[d]?.['合計'])  ?? 0);
+  const shortLabels = chartDates.map(d => d.slice(5)); // MM-DD
+
+  instChart = new Chart(document.getElementById('instChart'), {
+    type: 'bar',
+    data: {
+      labels: shortLabels,
+      datasets: [
+        { label: '外資', data: foreign, backgroundColor: 'rgba(25,118,210,.75)',  order: 2 },
+        { label: '投信', data: trust,   backgroundColor: 'rgba(56,142,60,.75)',   order: 2 },
+        { label: '自營', data: dealer,  backgroundColor: 'rgba(245,124,0,.75)',   order: 2 },
+        {
+          label: '三大合計', data: total,
+          type: 'line',
+          borderColor: '#d32f2f', backgroundColor: 'transparent',
+          borderWidth: 2, pointRadius: 3, tension: 0.3, order: 1
+        },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.raw?.toLocaleString()}`
+          }
+        }
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: { stacked: true, ticks: { callback: v => (v/1e6).toFixed(1)+'M' } }
+      }
+    }
+  });
+
+  /* ── margin dual-axis line chart ── */
+  const marginBal = chartDates.map(d => parseNum(marginMap[d]?.['融資餘額']));
+  const shortBal  = chartDates.map(d => parseNum(marginMap[d]?.['融券餘額']));
+
+  marginChart = new Chart(document.getElementById('marginChart'), {
+    type: 'line',
+    data: {
+      labels: shortLabels,
+      datasets: [
+        {
+          label: '融資餘額', data: marginBal, yAxisID: 'yL',
+          borderColor: '#1a73e8', backgroundColor: 'rgba(26,115,232,.1)',
+          borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3,
+          spanGaps: true,
+        },
+        {
+          label: '融券餘額', data: shortBal, yAxisID: 'yR',
+          borderColor: '#e53935', backgroundColor: 'rgba(229,57,53,.1)',
+          borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3,
+          spanGaps: true,
+        },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.raw?.toLocaleString() ?? '-'} 張`
+          }
+        }
+      },
+      scales: {
+        x:  { grid: { display: false } },
+        yL: { position: 'left',  title: { display: true, text: '融資餘額（張）' }, grid: { color: '#f0f0f0' } },
+        yR: { position: 'right', title: { display: true, text: '融券餘額（張）' }, grid: { display: false } },
+      }
+    }
+  });
+}
+</script>
+</body>
+</html>
