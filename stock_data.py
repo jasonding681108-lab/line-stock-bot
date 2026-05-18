@@ -35,28 +35,6 @@ def _past_trading_dates(n: int = 30) -> list[str]:
     return dates
 
 
-def _fmt(n: int | str) -> str:
-    """Format integer with sign + comma separators."""
-    if isinstance(n, str):
-        n = n.replace(",", "").strip()
-        try:
-            n = int(n)
-        except ValueError:
-            return str(n)
-    sign = "+" if n > 0 else ""
-    return f"{sign}{n:,}"
-
-
-def _fmt_bal(n: int | str) -> str:
-    """Format balance (no sign, with commas)."""
-    if isinstance(n, str):
-        n = n.replace(",", "").strip()
-        try:
-            n = int(n)
-        except ValueError:
-            return str(n)
-    return f"{n:,}"
-
 
 # ──────────────────────────────────────────────
 # 法人買賣超 via FinMind
@@ -196,72 +174,3 @@ def _margin_twse_parallel(stock_id: str, days: int) -> list[dict]:
 
     results.sort(key=lambda x: x["date"], reverse=True)
     return results[:days]
-
-
-# ──────────────────────────────────────────────
-# Formatter  (combined per-day view)
-# ──────────────────────────────────────────────
-
-def format_combined(
-    stock_id: str,
-    inst_rows: list[dict],
-    margin_rows: list[dict],
-) -> str:
-    """
-    Build a single message showing, for each trading day:
-      - 外資 / 投信 / 自營 / 三大合計  (net buy/sell, shares)
-      - 融資餘額 / 融券餘額            (balance, 張)
-    Days are newest-first; LINE message stays well under 5000 chars.
-    """
-    if not inst_rows and not margin_rows:
-        return (
-            f"查無《{stock_id}》資料。\n"
-            "請確認為台灣上市／上櫃股票代號，例如 2330。"
-        )
-
-    # Index margin rows by date for O(1) lookup
-    margin_by_date = {r["date"]: r for r in margin_rows}
-
-    # Use institutional dates as the primary timeline;
-    # fall back to margin-only dates for any gap
-    seen: set[str] = set()
-    dates: list[str] = []
-    for r in inst_rows:
-        if r["date"] not in seen:
-            seen.add(r["date"])
-            dates.append(r["date"])
-    for r in margin_rows:
-        if r["date"] not in seen:
-            seen.add(r["date"])
-            dates.append(r["date"])
-    dates = sorted(dates, reverse=True)[:20]
-
-    inst_by_date = {r["date"]: r for r in inst_rows}
-
-    lines = [f"【{stock_id}】近 {len(dates)} 日法人買賣超＋融資融券\n"]
-
-    for date in dates:
-        inst = inst_by_date.get(date)
-        marg = margin_by_date.get(date)
-
-        # ── institutional section ──
-        if inst:
-            inst_line = (
-                f"外資 {_fmt(inst['外資'])} 投信 {_fmt(inst['投信'])}\n"
-                f"自營 {_fmt(inst['自營'])} 合計 {_fmt(inst['合計'])}"
-            )
-        else:
-            inst_line = "法人資料 -"
-
-        # ── margin section ──
-        if marg:
-            marg_line = (
-                f"融資餘額 {_fmt_bal(marg['融資餘額'])} "
-                f"融券餘額 {_fmt_bal(marg['融券餘額'])}"
-            )
-        else:
-            marg_line = "融資融券 -"
-
-        lines.append(f"▌{date}\n{inst_line}\n{marg_line}")
-
-    return "\n".join(lines)
