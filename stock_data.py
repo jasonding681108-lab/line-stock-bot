@@ -42,11 +42,9 @@ def _past_trading_dates(n: int = 30) -> list[str]:
 
 def get_stock_name(stock_id: str) -> str:
     """Return the company name for stock_id, or '' if not found."""
-    start = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
     params = {
-        "dataset": "TaiwanStockInstitutionalInvestorsBuySell",
+        "dataset": "TaiwanStockInfo",
         "data_id": stock_id,
-        "start_date": start,
         "token": _FINMIND_TOKEN,
     }
     try:
