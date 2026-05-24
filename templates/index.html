@@ -282,26 +282,36 @@
    Watchlist
 ══════════════════════════════════════════ */
 const WL_KEY = 'tw_stock_watchlist';
+const WL_VER_KEY = 'tw_stock_watchlist_ver';
+const WL_VERSION = 2;  // bump this whenever DEFAULT_WATCHLIST changes
 
 const DEFAULT_WATCHLIST = [
-  { code: '1802', name: '台玻' },
+  { code: '3105', name: '穩懋' },
   { code: '2408', name: '南亞科' },
-  { code: '3037', name: '欣興' },
+  { code: '3260', name: '威剛' },
+  { code: '1802', name: '台玻' },
   { code: '4916', name: '事欣科' },
-  { code: '6269', name: '台郡' },
+  { code: '3037', name: '欣興' },
   { code: '6530', name: '創威' },
+  { code: '6155', name: '鈞寶' },
 ];
 
 function loadWatchlist() {
   try {
+    const ver = parseInt(localStorage.getItem(WL_VER_KEY), 10);
     const saved = localStorage.getItem(WL_KEY);
-    if (saved) return JSON.parse(saved);
+    if (saved && ver === WL_VERSION) return JSON.parse(saved);
   } catch(e) {}
-  return DEFAULT_WATCHLIST.map(x => ({ ...x }));
+  const defaults = DEFAULT_WATCHLIST.map(x => ({ ...x }));
+  saveWatchlist(defaults);
+  return defaults;
 }
 
 function saveWatchlist(list) {
-  try { localStorage.setItem(WL_KEY, JSON.stringify(list)); } catch(e) {}
+  try {
+    localStorage.setItem(WL_KEY, JSON.stringify(list));
+    localStorage.setItem(WL_VER_KEY, WL_VERSION);
+  } catch(e) {}
 }
 
 function renderWatchlist() {
