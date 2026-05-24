@@ -1,6 +1,6 @@
 import re
 from flask import Flask, jsonify, render_template
-from stock_data import get_institutional, get_margin
+from stock_data import get_institutional, get_margin, get_stock_name
 
 app = Flask(__name__)
 
@@ -10,6 +10,13 @@ _STOCK_RE = re.compile(r"^\d{4,6}$")
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/api/name/<stock_id>")
+def name_api(stock_id: str):
+    if not _STOCK_RE.match(stock_id):
+        return jsonify({"name": ""}), 400
+    return jsonify({"name": get_stock_name(stock_id)})
 
 
 @app.route("/api/stock/<stock_id>")

@@ -40,6 +40,26 @@ def _past_trading_dates(n: int = 30) -> list[str]:
 # 法人買賣超 via FinMind
 # ──────────────────────────────────────────────
 
+def get_stock_name(stock_id: str) -> str:
+    """Return the company name for stock_id, or '' if not found."""
+    start = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    params = {
+        "dataset": "TaiwanStockInstitutionalInvestorsBuySell",
+        "data_id": stock_id,
+        "start_date": start,
+        "token": _FINMIND_TOKEN,
+    }
+    try:
+        r = requests.get(_FINMIND, params=params, timeout=8, headers=_HEADERS)
+        r.raise_for_status()
+        data = r.json().get("data", [])
+        if data:
+            return data[0].get("stock_name", "").strip()
+    except Exception:
+        pass
+    return ""
+
+
 def get_institutional(stock_id: str, days: int = 20) -> list[dict]:
     """
     Return up to `days` rows of institutional net buy/sell, newest first.

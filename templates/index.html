@@ -331,7 +331,7 @@ function renderWatchlist() {
   `).join('');
 }
 
-function addToWatchlist() {
+async function addToWatchlist() {
   const raw = document.getElementById('wl-input').value.trim();
   if (!raw) return;
 
@@ -341,7 +341,7 @@ function addToWatchlist() {
     return;
   }
   const code = m[1];
-  const name = m[2].trim();
+  let name = m[2].trim();
 
   const list = loadWatchlist();
   if (list.some(x => x.code === code)) {
@@ -349,6 +349,18 @@ function addToWatchlist() {
     document.getElementById('wl-input').value = '';
     return;
   }
+
+  if (!name) {
+    const btn = document.querySelector('.wl-add-row button');
+    btn.disabled = true;
+    try {
+      const res = await fetch(`/api/name/${code}`);
+      const data = await res.json();
+      name = data.name || '';
+    } catch(e) {}
+    btn.disabled = false;
+  }
+
   list.push({ code, name });
   saveWatchlist(list);
   renderWatchlist();
