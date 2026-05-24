@@ -29,7 +29,7 @@ Copy `.env.example` to `.env` and fill in credentials before running.
 
 - `get_institutional(stock_id, days=45)` — fetches 三大法人買賣超 from FinMind (`TaiwanStockInstitutionalInvestorsBuySell`), aggregates by date into 外資 / 投信 / 自營 / 合計. Returns 45 days to cover month-start cumulative calculations.
 - `get_margin(stock_id)` — tries FinMind first (`TaiwanStockMarginPurchaseShortSale`); falls back to parallel TWSE scraping (`_margin_twse_parallel`) if FinMind returns no data.
-- `get_stock_name(stock_id)` — fetches company name from FinMind (`TaiwanStockInstitutionalInvestorsBuySell`, past 7 days) and returns the `stock_name` field; returns `''` on failure.
+- `get_stock_name(stock_id)` — fetches company name from FinMind (`TaiwanStockInfo`) and returns the `stock_name` field; returns `''` on failure. Note: `TaiwanStockInstitutionalInvestorsBuySell` does **not** have a `stock_name` field — must use `TaiwanStockInfo`.
 
 ### API endpoints (`web_app.py`)
 
