@@ -58,6 +58,38 @@ def get_stock_name(stock_id: str) -> str:
     return ""
 
 
+_stock_list_cache: list[dict] | None = None
+
+
+def _all_stock_info() -> list[dict]:
+    """Return (and cache) the full TaiwanStockInfo list."""
+    global _stock_list_cache
+    if _stock_list_cache is not None:
+        return _stock_list_cache
+    params = {"dataset": "TaiwanStockInfo", "token": _FINMIND_TOKEN}
+    try:
+        r = requests.get(_FINMIND, params=params, timeout=15, headers=_HEADERS)
+        r.raise_for_status()
+        _stock_list_cache = r.json().get("data", [])
+    except Exception:
+        return []
+    return _stock_list_cache
+
+
+def find_stock_by_name(query: str) -> dict | None:
+    """Look up a stock by (partial) company name, e.g. '台積電' -> {'stock_id': '2330', 'stock_name': '台積電'}."""
+    query = query.strip()
+    if not query:
+        return None
+    for row in _all_stock_info():
+        if row.get("stock_name", "").strip() == query:
+            return {"stock_id": row["stock_id"], "stock_name": row["stock_name"].strip()}
+    for row in _all_stock_info():
+        if query in row.get("stock_name", ""):
+            return {"stock_id": row["stock_id"], "stock_name": row["stock_name"].strip()}
+    return None
+
+
 def get_institutional(stock_id: str, days: int = 20) -> list[dict]:
     """
     Return up to `days` rows of institutional net buy/sell, newest first.

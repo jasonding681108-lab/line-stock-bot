@@ -259,7 +259,7 @@
     </div>
     <div id="wl-chips" class="wl-chips"></div>
     <div class="wl-add-row">
-      <input id="wl-input" type="text" placeholder="新增代號，例如：2330 或 2330 台積電"
+      <input id="wl-input" type="text" placeholder="新增代號或名稱，例如：2330、台積電"
              maxlength="20" onkeydown="if(event.key==='Enter') addToWatchlist()" />
       <button onclick="addToWatchlist()">＋ 新增</button>
     </div>
@@ -335,13 +335,33 @@ async function addToWatchlist() {
   const raw = document.getElementById('wl-input').value.trim();
   if (!raw) return;
 
+  const btn = document.querySelector('.wl-add-row button');
+  let code, name;
+
   const m = raw.match(/^(\d{4,6})[^\d]*(.*)/);
-  if (!m) {
-    alert('請輸入 4~6 碼數字股票代號');
-    return;
+  if (m) {
+    code = m[1];
+    name = m[2].trim();
+  } else {
+    // No leading stock code — treat input as a company name and look it up.
+    btn.disabled = true;
+    try {
+      const res = await fetch(`/api/lookup/${encodeURIComponent(raw)}`);
+      const data = await res.json();
+      if (!res.ok || !data.code) {
+        alert(data.error || `查無《${raw}》對應的股票`);
+        btn.disabled = false;
+        return;
+      }
+      code = data.code;
+      name = data.name || raw;
+    } catch (e) {
+      alert('查詢失敗，請稍後再試');
+      btn.disabled = false;
+      return;
+    }
+    btn.disabled = false;
   }
-  const code = m[1];
-  let name = m[2].trim();
 
   const list = loadWatchlist();
   if (list.some(x => x.code === code)) {
@@ -351,7 +371,6 @@ async function addToWatchlist() {
   }
 
   if (!name) {
-    const btn = document.querySelector('.wl-add-row button');
     btn.disabled = true;
     try {
       const res = await fetch(`/api/name/${code}`);

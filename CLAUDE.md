@@ -37,6 +37,7 @@ Copy `.env.example` to `.env` and fill in credentials before running.
 |----------|---------|
 | `GET /api/stock/<id>` | `{stock_id, institutional, margin}` |
 | `GET /api/name/<id>` | `{name}` — company name lookup used by watchlist add |
+| `GET /api/lookup/<query>` | `{code, name}` — resolves either a stock code or a company name (via `find_stock_by_name`) used by watchlist add |
 
 ### Environment variables
 
@@ -50,7 +51,7 @@ The watchlist in `index.html` is entirely client-side — stored in `localStorag
 
 **Version-based reset:** `WL_VERSION` (integer constant) and `tw_stock_watchlist_ver` (localStorage key) are used to detect stale data. When `DEFAULT_WATCHLIST` changes, bump `WL_VERSION` by 1 — all users will automatically receive the new defaults on next page load without needing to clear localStorage manually.
 
-**Auto name lookup:** `addToWatchlist()` is async. If the user enters only a stock code (no name), it calls `/api/name/<code>` to fetch the company name before saving the chip.
+**Auto name lookup:** `addToWatchlist()` is async. If the user enters only a stock code (no name), it calls `/api/name/<code>` to fetch the company name before saving the chip. If the input has no leading stock code at all (e.g. the user typed just a company name like 台積電), it instead calls `/api/lookup/<query>` to resolve the code + name via `stock_data.find_stock_by_name` (exact match first, then substring match against the cached `TaiwanStockInfo` list).
 
 ### Institutional cumulative logic (frontend)
 

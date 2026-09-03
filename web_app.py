@@ -1,6 +1,6 @@
 import re
 from flask import Flask, jsonify, render_template
-from stock_data import get_institutional, get_margin, get_stock_name
+from stock_data import get_institutional, get_margin, get_stock_name, find_stock_by_name
 
 app = Flask(__name__)
 
@@ -17,6 +17,17 @@ def name_api(stock_id: str):
     if not _STOCK_RE.match(stock_id):
         return jsonify({"name": ""}), 400
     return jsonify({"name": get_stock_name(stock_id)})
+
+
+@app.route("/api/lookup/<query>")
+def lookup_api(query: str):
+    """Resolve a stock code or company name to {code, name}."""
+    if _STOCK_RE.match(query):
+        return jsonify({"code": query, "name": get_stock_name(query)})
+    hit = find_stock_by_name(query)
+    if not hit:
+        return jsonify({"error": f"查無《{query}》對應的股票"}), 404
+    return jsonify({"code": hit["stock_id"], "name": hit["stock_name"]})
 
 
 @app.route("/api/stock/<stock_id>")
